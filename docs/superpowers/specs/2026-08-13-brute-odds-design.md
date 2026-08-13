@@ -137,10 +137,22 @@ Un chiffre silencieusement faux est le seul résultat inacceptable.
 
 Le résultat est affiché comme l'estimation qu'il est : `63 % ± 3`, jamais `63,4 %`.
 
-Le nombre de simulations sera **calibré après mesure réelle** du coût d'un combat — aucun
-chiffre n'est avancé ici, il n'a pas encore été mesuré. Cible : sous ~2 s pour l'ensemble
-des adversaires, calcul en Web Worker pour ne pas figer la page, affichage progressif au
-fil des résultats.
+Le nombre de simulations est **`SIMULATIONS = 2000`** (`src/odds/config.ts`), issu de la
+mesure réelle de `scripts/bench.ts` (`npm run bench`) : ≈ 0,043 ms par combat (moyenne de
+6 exécutions de 2000 combats, après une chauffe de 200 combats), mesuré sur un Intel Core
+i7-11700K (8 cœurs), Node v24.18.0. Règle de décision : le plus grand N tel que
+`coût × N × 6 ≤ 2 s`, plafonné à 2000. À ce coût mesuré, 2000 simulations × 6 adversaires
+ne consomment qu'environ 0,52 s — c'est donc le plafond de 2000 qui fixe N, pas le budget
+de 2 s. Calcul en Web Worker pour ne pas figer la page, affichage progressif au fil des
+résultats.
+
+**Limite de la mesure :** `makeBrute()` produit des brutes par défaut sans compétence, arme
+ni familier — un combat volontairement bon marché. Des brutes réelles, équipées, coûteront
+plus cher à simuler. La marge est cependant large : au coût mesuré, il faudrait un combat
+environ 3,9 fois plus coûteux (~0,167 ms) avant que le budget de 2 s redevienne la
+contrainte active plutôt que le plafond de 2000 ; en dessous de ce seuil, `SIMULATIONS = 2000`
+reste valide. Si des combats avec compétences/armes/familiers s'avèrent plus coûteux que ce
+seuil, ce chiffre devra être remesuré sur des brutes équipées.
 
 **Risque de performance identifié :** les fonctions du moteur empilent des `steps`
 d'animation dont nous n'avons aucun usage. Sur des milliers de combats, l'allocation puis

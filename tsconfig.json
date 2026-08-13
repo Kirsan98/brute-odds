@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "@labrute/core": ["./vendor/labrute/core/src/index.ts"],
+      // Le moteur importe aussi des chemins profonds (`@labrute/core/src/brute/bosses.js`).
+      "@labrute/core/*": ["./vendor/labrute/core/*"],
+      // Vitest et esbuild visent `index-browser.js` (les enums, exécutables hors serveur) ;
+      // `tsc` vise sa déclaration, seule à porter les types du modèle `Brute`.
+      "@labrute/prisma": ["./vendor/labrute/prisma/index.d.ts"]
+    }
+  },
+  "include": ["src", "tests", "scripts", "vitest.config.ts"],
+  "exclude": ["vendor"]
+}

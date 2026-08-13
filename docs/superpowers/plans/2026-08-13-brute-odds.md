@@ -27,7 +27,7 @@
 C'est la tâche la plus risquée du plan, donc elle est première : elle prouve que les enums Prisma du jeu se chargent hors du serveur. Si ça échoue, tout le reste est à repenser.
 
 **Files:**
-- Create: `package.json`, `tsconfig.json`, `.gitignore`, `vitest.config.ts`, `scripts/vendor.sh`, `scripts/esbuild-ts-ext.mjs`
+- Create: `package.json`, `tsconfig.json`, `.gitignore`, `vitest.config.ts`, `scripts/vendor.sh`
 - Test: `tests/vendor.test.ts`
 
 **Interfaces:**
@@ -70,7 +70,8 @@ mkdir -p "$DEST"
 git -C "$DEST" init -q
 git -C "$DEST" remote add origin "$UPSTREAM_URL"
 git -C "$DEST" config core.sparseCheckout true
-printf '%s\n' 'core/' 'prisma/' 'server/src/utils/' > "$DEST/.git/info/sparse-checkout"
+# LICENSE est indispensable : la tâche 10 en a besoin pour l'attribution.
+printf '%s\n' 'core/' 'prisma/' 'server/src/utils/' 'LICENSE' > "$DEST/.git/info/sparse-checkout"
 git -C "$DEST" fetch --depth 1 origin "$UPSTREAM_SHA" -q
 git -C "$DEST" checkout -q FETCH_HEAD
 echo "Moteur vendorisé depuis $UPSTREAM_SHA"
@@ -568,12 +569,13 @@ console.log(`6 adversaires x 1000 simulations = ${(perFight * 6000 / 1000).toFix
 ```
 
 ```bash
-npm pkg set scripts.bench="vitest run --testTimeout=0 scripts/bench.ts || npx tsx scripts/bench.ts"
+npm i -D tsx
+npm pkg set scripts.bench="tsx scripts/bench.ts"
 ```
 
 - [ ] **Step 2: Mesurer**
 
-Run: `npx tsx scripts/bench.ts`
+Run: `npm run bench`
 Noter le coût réel par combat.
 
 - [ ] **Step 3: Choisir N et l'écrire dans `src/odds/config.ts`**
@@ -838,6 +840,7 @@ git commit -m "feat(userscript): interception réseau et cache indexé par brute
 
 **Files:**
 - Create: `src/userscript/resolveBackups.ts`
+- Modify: `src/userscript/intercept.ts` (ajout de `fetchProfileBrutes`, étape 4)
 - Test: `tests/userscript/resolveBackups.test.ts`
 
 **Interfaces:**
@@ -976,7 +979,7 @@ npm i -D jsdom
 npm pkg set scripts.test="vitest run"
 ```
 
-Ajouter `environmentMatchGlobs: [['tests/userscript/inject.test.ts', 'jsdom']]` au bloc `test` de `vitest.config.ts`.
+Écart assumé : `environmentMatchGlobs` a disparu de Vitest 4. Le pragma `// @vitest-environment jsdom` en tête du fichier de test fait le même travail, et il le dit là où on le lit — inutile de tenir à jour une liste de chemins dans `vitest.config.ts`.
 
 - [ ] **Step 2: Écrire le test qui échoue**
 
@@ -1038,9 +1041,19 @@ export const formatOdds = (e: Estimation): string => {
     : `${pct} % ± ${ci}`;
 };
 
+// Correspondance exacte sur un nœud de texte : `includes` confondrait
+// « Sam » avec « Sam2 » et afficherait le score sur la mauvaise carte.
 const findCard = (name: string): Element | null => {
-  const nodes = Array.from(document.querySelectorAll('.MuiGrid-item'));
-  return nodes.find((n) => n.textContent?.includes(name)) ?? null;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if (node.textContent?.trim() === name) {
+      const card = (node.parentElement as Element | null)?.closest('.MuiGrid-item');
+      if (card) return card;
+    }
+    node = walker.nextNode();
+  }
+  return null;
 };
 
 export const renderOdds = (name: string, estimation: Estimation | 'pending') => {
@@ -1211,10 +1224,23 @@ commercial ni affiliation avec Motion Twin, EternalTwin ou les auteurs de LaBrut
 
 Doit contenir : ce que fait l'outil, l'installation (`npm i && npm run vendor && npm run build`, puis glisser `dist/brute-odds.user.js` dans Tampermonkey), la mise à jour du moteur (changer `UPSTREAM_SHA`, relancer `npm run vendor && npm test`), et l'avertissement que le résultat est une estimation statistique.
 
-- [ ] **Step 6: Vérification finale**
+- [ ] **Step 6: Câbler le typecheck**
 
-Run: `npm test && npm run build`
-Attendu : tous les tests passent, le build produit le fichier.
+Sans ça, rien ne vérifie les types du projet : Vitest et esbuild effacent les types sans les contrôler. L'annotation `DetailedFight` de la tâche 2, censée faire échouer la compilation quand l'amont change de forme, ne sert à rien tant que `tsc` ne tourne pas.
+
+Déjà fait, en marge de la tâche 8 : les `paths` (posés en tâche 5) ont été réparés — TypeScript 7 a supprimé `baseUrl`, ce qui faisait échouer `tsc` avant même de vérifier une ligne — puis `npm run typecheck` a été câblé. Il ne reste ici qu'à vérifier que la commande passe toujours.
+
+Écart assumé sur la consigne ci-dessous : `exclude` ne filtre que les fichiers d'entrée, jamais ceux qu'on importe, donc il ne sort pas le moteur du périmètre de `tsc`. C'est `scripts/vendor.sh` qui préfixe chaque `.ts` vendorisé d'un `// @ts-nocheck` après le checkout. Les options du compilateur restent strictes, et les types exportés par le moteur continuent de contrôler notre code — seules les erreurs *internes* au code amont (contexte Prisma, OpenTelemetry, non vendorisés) sont tues.
+
+Vérifier au passage que les alias de `tsconfig.json`, `vitest.config.ts` et `scripts/build.mjs` désignent bien les trois mêmes chemins : trois outils, trois formats de configuration, une seule vérité. Une divergence ferait tester, mesurer et livrer trois codes différents.
+
+Run: `npm run typecheck`
+Attendu : aucune erreur sur `src/`. Si le code vendorisé produit des erreurs qui lui sont propres, l'exclure du périmètre via `include`/`exclude` plutôt que d'assouplir les options du compilateur.
+
+- [ ] **Step 7: Vérification finale**
+
+Run: `npm test && npm run typecheck && npm run build`
+Attendu : tous les tests passent, aucune erreur de type, le build produit le fichier.
 
 - [ ] **Step 7: Commit et publication**
 
