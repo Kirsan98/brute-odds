@@ -1224,10 +1224,35 @@ commercial ni affiliation avec Motion Twin, EternalTwin ou les auteurs de LaBrut
 
 Doit contenir : ce que fait l'outil, l'installation (`npm i && npm run vendor && npm run build`, puis glisser `dist/brute-odds.user.js` dans Tampermonkey), la mise à jour du moteur (changer `UPSTREAM_SHA`, relancer `npm run vendor && npm test`), et l'avertissement que le résultat est une estimation statistique.
 
-- [ ] **Step 6: Vérification finale**
+- [ ] **Step 6: Câbler le typecheck**
 
-Run: `npm test && npm run build`
-Attendu : tous les tests passent, le build produit le fichier.
+Sans ça, rien ne vérifie les types du projet : Vitest et esbuild effacent les types sans les contrôler. L'annotation `DetailedFight` de la tâche 2, censée faire échouer la compilation quand l'amont change de forme, ne sert à rien tant que `tsc` ne tourne pas.
+
+Ajouter à `tsconfig.json` les mêmes alias que `vitest.config.ts` :
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@labrute/core": ["./vendor/labrute/core/src/index.ts"],
+      "@labrute/prisma": ["./vendor/labrute/prisma/index-browser.js"]
+    }
+  }
+}
+```
+
+```bash
+npm pkg set scripts.typecheck="tsc --noEmit"
+```
+
+Run: `npm run typecheck`
+Attendu : aucune erreur sur `src/`. Si le code vendorisé produit des erreurs qui lui sont propres, l'exclure du périmètre via `include`/`exclude` plutôt que d'assouplir les options du compilateur.
+
+- [ ] **Step 7: Vérification finale**
+
+Run: `npm test && npm run typecheck && npm run build`
+Attendu : tous les tests passent, aucune erreur de type, le build produit le fichier.
 
 - [ ] **Step 7: Commit et publication**
 
