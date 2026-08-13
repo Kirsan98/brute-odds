@@ -9,7 +9,12 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@labrute/core": ["./vendor/labrute/core/src/index.ts"],
+      "@labrute/prisma": ["./vendor/labrute/prisma/index-browser.js"]
+    }
   },
   "include": ["src", "tests", "scripts", "vitest.config.ts"]
 }
