@@ -1228,23 +1228,13 @@ Doit contenir : ce que fait l'outil, l'installation (`npm i && npm run vendor &&
 
 Sans ça, rien ne vérifie les types du projet : Vitest et esbuild effacent les types sans les contrôler. L'annotation `DetailedFight` de la tâche 2, censée faire échouer la compilation quand l'amont change de forme, ne sert à rien tant que `tsc` ne tourne pas.
 
-Ajouter à `tsconfig.json` les mêmes alias que `vitest.config.ts` :
-
-```json
-{
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@labrute/core": ["./vendor/labrute/core/src/index.ts"],
-      "@labrute/prisma": ["./vendor/labrute/prisma/index-browser.js"]
-    }
-  }
-}
-```
+Les `paths` de `tsconfig.json` ont déjà été ajoutés lors de la tâche 5 (ils étaient nécessaires pour rendre `npm run bench` reproductible). Il ne reste donc qu'à câbler la commande :
 
 ```bash
 npm pkg set scripts.typecheck="tsc --noEmit"
 ```
+
+Vérifier au passage que les alias de `tsconfig.json`, `vitest.config.ts` et `scripts/build.mjs` désignent bien les trois mêmes chemins : trois outils, trois formats de configuration, une seule vérité. Une divergence ferait tester, mesurer et livrer trois codes différents.
 
 Run: `npm run typecheck`
 Attendu : aucune erreur sur `src/`. Si le code vendorisé produit des erreurs qui lui sont propres, l'exclure du périmètre via `include`/`exclude` plutôt que d'assouplir les options du compilateur.
