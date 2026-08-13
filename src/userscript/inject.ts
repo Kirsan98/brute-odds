@@ -25,51 +25,52 @@ const findCard = (name: string): Element | null => {
   return null;
 };
 
-const paint = (name: string, estimation: Estimation | 'pending'): boolean => {
+const label = (estimation: Estimation | 'pending') => (
+  estimation === 'pending' ? '…' : formatOdds(estimation)
+);
+
+const paint = (name: string, estimation: Estimation | 'pending') => {
   const card = findCard(name);
-  if (!card) return false;
+  if (!card) return;
 
-  // Remplacer, pas empiler : la page rejoue le rendu à chaque changement de brute.
-  card.querySelector('.brute-odds')?.remove();
+  const text = label(estimation);
+  const badge = card.querySelector('.brute-odds');
+  // Ne rien écrire quand rien ne change : sinon notre propre mutation réveille
+  // l'observateur, qui réécrit, qui le réveille — sans fin.
+  if (badge?.textContent === text) return;
 
-  const badge = document.createElement('div');
-  badge.className = 'brute-odds';
-  badge.style.cssText = 'text-align:center;font-weight:700;padding:2px 0;';
-  badge.textContent = estimation === 'pending' ? '…' : formatOdds(estimation);
-  card.appendChild(badge);
-  return true;
+  badge?.remove();
+  const replacement = document.createElement('div');
+  replacement.className = 'brute-odds';
+  replacement.style.cssText = 'text-align:center;font-weight:700;padding:2px 0;';
+  replacement.textContent = text;
+  card.appendChild(replacement);
 };
 
-const awaiting = new Map<string, Estimation | 'pending'>();
+/** Ce qu'on veut voir affiché, par adversaire — pas ce qu'on a réussi à afficher. */
+const shown = new Map<string, Estimation | 'pending'>();
 let observer: MutationObserver | undefined;
 
-const flush = () => {
-  awaiting.forEach((estimation, name) => {
-    if (paint(name, estimation)) awaiting.delete(name);
-  });
-  if (!awaiting.size) {
-    observer?.disconnect();
-    observer = undefined;
-  }
-};
+const repaintAll = () => shown.forEach((estimation, name) => paint(name, estimation));
 
-/** Affiche l'estimation sur la carte de `name`, maintenant ou dès qu'elle existe :
- *  on intercepte la réponse réseau, la page ne rend ses cartes qu'ensuite. Ce qui
- *  vient d'être peint sort de la file, donc notre propre mutation ne relance rien. */
+/** Affiche l'estimation sur la carte de `name`, et la remet en place tant qu'on est là.
+ *  Deux raisons : on lit la réponse réseau avant que la page ait rendu ses cartes, et
+ *  React redessine ensuite quand bon lui semble, emportant des badges qu'il n'a pas
+ *  créés. Peindre une seule fois perdait la moitié des résultats. */
 export const renderOdds = (name: string, estimation: Estimation | 'pending') => {
-  if (paint(name, estimation)) return;
+  shown.set(name, estimation);
+  paint(name, estimation);
 
-  awaiting.set(name, estimation);
   if (!observer) {
-    observer = new MutationObserver(flush);
+    observer = new MutationObserver(repaintAll);
     observer.observe(document.body, { childList: true, subtree: true });
   }
 };
 
-/** Oublie les cartes encore attendues et débranche l'observateur. Sans ça, un nom
- *  qui n'apparaît jamais garde une prise sur un `document` que les tests ont remplacé. */
-export const resetPending = () => {
-  awaiting.clear();
+/** Oublie tout et débranche l'observateur — sans quoi il garde une prise sur un
+ *  `document` que les tests ont remplacé. */
+export const resetOdds = () => {
+  shown.clear();
   observer?.disconnect();
   observer = undefined;
 };

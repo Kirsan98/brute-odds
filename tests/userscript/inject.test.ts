@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
 import {
-  beforeEach, describe, expect, it, vi,
+  afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
-import { formatOdds, renderOdds, resetPending } from '../../src/userscript/inject.js';
+import { formatOdds, renderOdds, resetOdds } from '../../src/userscript/inject.js';
 
 describe('affichage', () => {
   beforeEach(() => {
-    resetPending();
+    resetOdds();
     document.body.innerHTML = `
       <div class="MuiGrid-item"><span>Adversaire1</span></div>
       <div class="MuiGrid-item"><span>Adversaire2</span></div>`;
   });
+
+  // L'observateur survit au test : sans ça, il se réveille sur un `document` détruit.
+  afterEach(resetOdds);
 
   it('formate une estimation sans fausse précision', () => {
     expect(formatOdds({
@@ -67,6 +70,36 @@ describe('affichage', () => {
     await vi.waitFor(() => {
       expect(document.querySelector('.brute-odds')?.textContent).toBe('42 % ± 2');
     });
+  });
+
+  // Observé en vrai : sur 6 adversaires, 4 badges disparaissaient — la page se
+  // redessinait par-dessus, et seuls les 2 derniers arrivaient après.
+  it('repose le badge que la page a effacé en se redessinant', async () => {
+    renderOdds('Adversaire1', {
+      winRate: 0.42, ci: 0.02, samples: 1000, approximate: false,
+    });
+    expect(document.querySelector('.brute-odds')?.textContent).toBe('42 % ± 2');
+
+    document.body.innerHTML = '<div class="MuiGrid-item"><span>Adversaire1</span></div>';
+
+    await vi.waitFor(() => {
+      expect(document.querySelector('.brute-odds')?.textContent).toBe('42 % ± 2');
+    });
+  });
+
+  it('laisse en place un badge déjà à jour', async () => {
+    renderOdds('Adversaire1', {
+      winRate: 0.42, ci: 0.02, samples: 1000, approximate: false,
+    });
+    const badge = document.querySelector('.brute-odds');
+
+    document.body.appendChild(document.createElement('div'));
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+
+    // Même nœud, pas un remplaçant : sans ce test, rien n'interdit à l'observateur
+    // de se réveiller sur sa propre écriture, indéfiniment.
+    expect(document.querySelector('.brute-odds')).toBe(badge);
+    expect(document.querySelectorAll('.brute-odds').length).toBe(1);
   });
 
   it('ne confond pas un nom avec un nom plus long qui le contient', () => {
