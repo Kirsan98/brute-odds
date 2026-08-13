@@ -96,4 +96,16 @@ describe('installInterceptor', () => {
 
     await expect(fetch('https://labrute.example/api/brute/Sam/get-opponents/1')).resolves.toBeInstanceOf(Response);
   });
+
+  it('ne capture les en-têtes que sur les requêtes de l\'API du jeu, pour ne pas les écraser avec une requête hors-jeu', async () => {
+    stubGameFetch(vi.fn().mockResolvedValue(new Response('ok')));
+    installInterceptor(vi.fn());
+
+    await fetch('https://labrute.example/api/brute/Sam/for-hook', { headers: { 'x-security-check': 'bon' } });
+    expect(store.getHeaders()).toEqual({ 'x-security-check': 'bon' });
+
+    await fetch('https://labrute.example/analytics/beacon', { headers: { 'x-security-check': 'mauvais' } });
+
+    expect(store.getHeaders()).toEqual({ 'x-security-check': 'bon' });
+  });
 });
