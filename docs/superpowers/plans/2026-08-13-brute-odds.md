@@ -1228,11 +1228,9 @@ Doit contenir : ce que fait l'outil, l'installation (`npm i && npm run vendor &&
 
 Sans ça, rien ne vérifie les types du projet : Vitest et esbuild effacent les types sans les contrôler. L'annotation `DetailedFight` de la tâche 2, censée faire échouer la compilation quand l'amont change de forme, ne sert à rien tant que `tsc` ne tourne pas.
 
-Les `paths` de `tsconfig.json` ont déjà été ajoutés lors de la tâche 5 (ils étaient nécessaires pour rendre `npm run bench` reproductible). Il ne reste donc qu'à câbler la commande :
+Déjà fait, en marge de la tâche 8 : les `paths` (posés en tâche 5) ont été réparés — TypeScript 7 a supprimé `baseUrl`, ce qui faisait échouer `tsc` avant même de vérifier une ligne — puis `npm run typecheck` a été câblé. Il ne reste ici qu'à vérifier que la commande passe toujours.
 
-```bash
-npm pkg set scripts.typecheck="tsc --noEmit"
-```
+Écart assumé sur la consigne ci-dessous : `exclude` ne filtre que les fichiers d'entrée, jamais ceux qu'on importe, donc il ne sort pas le moteur du périmètre de `tsc`. C'est `scripts/vendor.sh` qui préfixe chaque `.ts` vendorisé d'un `// @ts-nocheck` après le checkout. Les options du compilateur restent strictes, et les types exportés par le moteur continuent de contrôler notre code — seules les erreurs *internes* au code amont (contexte Prisma, OpenTelemetry, non vendorisés) sont tues.
 
 Vérifier au passage que les alias de `tsconfig.json`, `vitest.config.ts` et `scripts/build.mjs` désignent bien les trois mêmes chemins : trois outils, trois formats de configuration, une seule vérité. Une divergence ferait tester, mesurer et livrer trois codes différents.
 

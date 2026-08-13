@@ -9,7 +9,8 @@
   "scripts": {
     "test": "vitest run",
     "vendor": "bash scripts/vendor.sh",
-    "bench": "tsx scripts/bench.ts"
+    "bench": "tsx scripts/bench.ts",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",

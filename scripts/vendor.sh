@@ -18,4 +18,12 @@ git -C "$DEST" config core.sparseCheckout true
 printf '%s\n' 'core/' 'prisma/' 'server/src/utils/' 'LICENSE' 'tsconfig.json' > "$DEST/.git/info/sparse-checkout"
 git -C "$DEST" fetch --depth 1 origin "$UPSTREAM_SHA" -q
 git -C "$DEST" checkout -q FETCH_HEAD
+
+# Le moteur amont est écrit pour le serveur du jeu : il importe son contexte Prisma et
+# OpenTelemetry, qu'on ne vendorise pas. `tsc` le compile quand même, car `exclude` ne
+# filtre que les fichiers d'entrée, jamais ceux qu'on importe. On neutralise donc la
+# vérification *à l'intérieur* de ces fichiers ; les types qu'ils exportent, eux,
+# continuent de contrôler notre code — c'est tout ce qu'on leur demande.
+find "$DEST" -name '*.ts' ! -name '*.d.ts' -exec sed -i '1i // @ts-nocheck' {} +
+
 echo "Moteur vendorisé depuis $UPSTREAM_SHA"

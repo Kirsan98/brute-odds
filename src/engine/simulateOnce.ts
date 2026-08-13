@@ -1,4 +1,6 @@
-import { getCalculatedBrute, StepType, type Modifiers } from '@labrute/core';
+import {
+  getCalculatedBrute, StepType, type CalculatedBrute, type Modifiers,
+} from '@labrute/core';
 import { getFighters } from '../../vendor/labrute/server/src/utils/fight/getFighters.js';
 import {
   checkDeaths, fighterArrives, orderFighters, playFighterTurn, saboteur,
@@ -8,6 +10,14 @@ import type { DetailedFight } from '../../vendor/labrute/server/src/utils/fight/
 import type { RawBrute } from './types.js';
 
 const MAX_RETRIES = 10;
+
+/** `getCalculatedBrute` conserve la forme de son entrée : appliqué à notre `RawBrute`,
+ *  qui n'a que les champs renvoyés par l'API, il rend une brute plus étroite que la
+ *  `CalculatedBrute` du serveur — laquelle traîne tout le modèle Prisma. Le moteur de
+ *  combat ne lit que les champs que nous avons ; on assume le contrat ici, une fois,
+ *  plutôt que d'élargir `RawBrute` avec des champs qu'on n'a pas. */
+const calculate = (brute: RawBrute, modifiers: Modifiers): CalculatedBrute =>
+  getCalculatedBrute(brute, modifiers) as unknown as CalculatedBrute;
 
 /** Appelle `fn` jusqu'à `times` fois ; renvoie le premier résultat obtenu sans exception,
  *  ou relève la dernière erreur si toutes les tentatives ont échoué. */
@@ -27,18 +37,15 @@ const runFight = (
   brute: RawBrute, opponent: RawBrute, modifiers: Modifiers,
   backups: { own?: RawBrute; opponent?: RawBrute },
 ): 'win' | 'loss' => {
-  const b1 = getCalculatedBrute(brute, modifiers);
-  const b2 = getCalculatedBrute(opponent, modifiers);
-
   const fighters = getFighters({
     team1: {
-      brutes: [b1],
-      backups: backups.own ? [getCalculatedBrute(backups.own, modifiers)] : [],
+      brutes: [calculate(brute, modifiers)],
+      backups: backups.own ? [calculate(backups.own, modifiers)] : [],
       bosses: [],
     },
     team2: {
-      brutes: [b2],
-      backups: backups.opponent ? [getCalculatedBrute(backups.opponent, modifiers)] : [],
+      brutes: [calculate(opponent, modifiers)],
+      backups: backups.opponent ? [calculate(backups.opponent, modifiers)] : [],
       bosses: [],
     },
     modifiers,
