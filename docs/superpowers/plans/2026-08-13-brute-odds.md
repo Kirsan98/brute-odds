@@ -979,7 +979,7 @@ npm i -D jsdom
 npm pkg set scripts.test="vitest run"
 ```
 
-Ajouter `environmentMatchGlobs: [['tests/userscript/inject.test.ts', 'jsdom']]` au bloc `test` de `vitest.config.ts`.
+Écart assumé : `environmentMatchGlobs` a disparu de Vitest 4. Le pragma `// @vitest-environment jsdom` en tête du fichier de test fait le même travail, et il le dit là où on le lit — inutile de tenir à jour une liste de chemins dans `vitest.config.ts`.
 
 - [ ] **Step 2: Écrire le test qui échoue**
 
