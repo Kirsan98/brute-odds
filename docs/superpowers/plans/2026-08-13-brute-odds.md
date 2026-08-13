@@ -27,7 +27,7 @@
 C'est la tâche la plus risquée du plan, donc elle est première : elle prouve que les enums Prisma du jeu se chargent hors du serveur. Si ça échoue, tout le reste est à repenser.
 
 **Files:**
-- Create: `package.json`, `tsconfig.json`, `.gitignore`, `vitest.config.ts`, `scripts/vendor.sh`, `scripts/esbuild-ts-ext.mjs`
+- Create: `package.json`, `tsconfig.json`, `.gitignore`, `vitest.config.ts`, `scripts/vendor.sh`
 - Test: `tests/vendor.test.ts`
 
 **Interfaces:**
