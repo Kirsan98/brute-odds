@@ -44,8 +44,11 @@ const label = (estimation: Estimation | 'pending') => (
 // Posé par-dessus la carte plutôt qu'à sa suite : dans le flux, le badge d'une rangée
 // passait derrière le parchemin opaque de la rangée suivante. `z-index` le remet devant
 // ses voisins, `pointer-events:none` laisse la carte cliquable.
-const BADGE_STYLE = 'position:absolute;left:0;right:0;bottom:4px;z-index:20;'
-  + 'text-align:center;font-weight:700;font-size:13px;color:#000;'
+// Largeur du texte, centrée sur la carte : `left:0;right:0` prenait celle du conteneur,
+// qui déborde du parchemin.
+const BADGE_STYLE = 'position:absolute;left:50%;transform:translateX(-50%);'
+  + 'bottom:4px;z-index:20;white-space:nowrap;padding:1px 6px;'
+  + 'font-weight:700;font-size:13px;color:#000;'
   + 'background:rgba(255,255,255,.82);border-radius:3px;pointer-events:none;';
 
 const badgesFor = (name: string) => [...document.querySelectorAll('.brute-odds')]
