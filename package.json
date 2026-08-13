@@ -10,7 +10,8 @@
     "test": "vitest run",
     "vendor": "bash scripts/vendor.sh",
     "bench": "tsx scripts/bench.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.mjs"
   },
   "repository": {
     "type": "git",
