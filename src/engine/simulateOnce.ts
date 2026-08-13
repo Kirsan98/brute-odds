@@ -33,24 +33,32 @@ export const retry = <T>(fn: () => T, times: number): T => {
   throw lastError;
 };
 
+/** Les deux camps tels que le moteur les voit avant le premier coup. Exporté pour le
+ *  test en or : c'est ici que se joue la justesse du simulateur, tout le reste n'est
+ *  que du hasard rejoué. */
+export const buildFighters = (
+  brute: RawBrute, opponent: RawBrute, modifiers: Modifiers,
+  backups: { own?: RawBrute; opponent?: RawBrute } = {},
+) => getFighters({
+  team1: {
+    brutes: [calculate(brute, modifiers)],
+    backups: backups.own ? [calculate(backups.own, modifiers)] : [],
+    bosses: [],
+  },
+  team2: {
+    brutes: [calculate(opponent, modifiers)],
+    backups: backups.opponent ? [calculate(backups.opponent, modifiers)] : [],
+    bosses: [],
+  },
+  modifiers,
+  clanFight: false,
+});
+
 const runFight = (
   brute: RawBrute, opponent: RawBrute, modifiers: Modifiers,
   backups: { own?: RawBrute; opponent?: RawBrute },
 ): 'win' | 'loss' => {
-  const fighters = getFighters({
-    team1: {
-      brutes: [calculate(brute, modifiers)],
-      backups: backups.own ? [calculate(backups.own, modifiers)] : [],
-      bosses: [],
-    },
-    team2: {
-      brutes: [calculate(opponent, modifiers)],
-      backups: backups.opponent ? [calculate(backups.opponent, modifiers)] : [],
-      bosses: [],
-    },
-    modifiers,
-    clanFight: false,
-  });
+  const fighters = buildFighters(brute, opponent, modifiers, backups);
 
   const fightData: DetailedFight = {
     modifiers,
