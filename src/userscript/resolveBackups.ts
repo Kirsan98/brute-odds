@@ -1,5 +1,5 @@
 import { SkillName } from '@labrute/prisma';
-import type { RawBrute } from '../engine/types.js';
+import type { BackupPools, RawBrute } from '../engine/types.js';
 
 type Deps = {
   ownBrutes: () => RawBrute[];
@@ -8,24 +8,24 @@ type Deps = {
 
 const hasBackup = (b: RawBrute) => (b.skills as string[]).includes(SkillName.backup);
 
-const pick = (candidates: RawBrute[], self: RawBrute) => {
-  const eligible = candidates.filter((c) => c.id !== self.id && c.level < self.level);
-  if (!eligible.length) return undefined;
-  return eligible[Math.floor(Math.random() * eligible.length)];
-};
+// Mêmes critères que le serveur (`generateFight.ts:219-227`) : une autre brute du même
+// joueur, de niveau strictement inférieur. Le tirage, lui, appartient au combat.
+const eligible = (candidates: RawBrute[], self: RawBrute) => candidates
+  .filter((candidate) => candidate.id !== self.id && candidate.level < self.level);
 
 export const resolveBackups = async (
   brute: RawBrute,
   opponent: RawBrute,
   deps: Deps,
-): Promise<{ own?: RawBrute; opponent?: RawBrute; approximate: boolean }> => {
-  const own = hasBackup(brute) ? pick(deps.ownBrutes(), brute) : undefined;
+): Promise<Required<BackupPools> & { approximate: boolean }> => {
+  const own = hasBackup(brute) ? eligible(deps.ownBrutes(), brute) : [];
 
-  if (!hasBackup(opponent)) return { own, opponent: undefined, approximate: false };
+  if (!hasBackup(opponent)) return { own, opponent: [], approximate: false };
 
   try {
-    return { own, opponent: pick(await deps.fetchProfileBrutes(opponent.name), opponent), approximate: false };
+    const theirs = eligible(await deps.fetchProfileBrutes(opponent.name), opponent);
+    return { own, opponent: theirs, approximate: false };
   } catch {
-    return { own, opponent: undefined, approximate: true };
+    return { own, opponent: [], approximate: true };
   }
 };

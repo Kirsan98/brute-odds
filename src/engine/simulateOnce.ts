@@ -7,7 +7,7 @@ import {
 } from '../../vendor/labrute/server/src/utils/fight/fightMethods.js';
 import { applySpy } from '../../vendor/labrute/server/src/utils/fight/applySpy.js';
 import type { DetailedFight } from '../../vendor/labrute/server/src/utils/fight/generateFight.js';
-import type { RawBrute } from './types.js';
+import type { BackupPools, RawBrute } from './types.js';
 
 const MAX_RETRIES = 10;
 
@@ -54,11 +54,22 @@ export const buildFighters = (
   clanFight: false,
 });
 
+/** Un renfort tiré au hasard dans le vivier, comme le serveur le fait à chaque combat
+ *  (`generateFight.ts:224-231`). Tirer une seule fois pour toutes les simulations
+ *  donnerait la probabilité de gagner *sachant ce renfort-là*, pas la probabilité de
+ *  gagner — deux choses différentes dès que le vivier n'est pas homogène. */
+export const drawBackup = (pool?: RawBrute[]): RawBrute | undefined => (
+  pool?.length ? pool[Math.floor(Math.random() * pool.length)] : undefined
+);
+
 const runFight = (
   brute: RawBrute, opponent: RawBrute, modifiers: Modifiers,
-  backups: { own?: RawBrute; opponent?: RawBrute },
+  backups: BackupPools,
 ): 'win' | 'loss' => {
-  const fighters = buildFighters(brute, opponent, modifiers, backups);
+  const fighters = buildFighters(brute, opponent, modifiers, {
+    own: drawBackup(backups.own),
+    opponent: drawBackup(backups.opponent),
+  });
 
   const fightData: DetailedFight = {
     modifiers,
@@ -114,5 +125,5 @@ const runFight = (
 
 export const simulateOnce = (
   brute: RawBrute, opponent: RawBrute, modifiers: Modifiers,
-  backups: { own?: RawBrute; opponent?: RawBrute } = {},
+  backups: BackupPools = {},
 ): 'win' | 'loss' => retry(() => runFight(brute, opponent, modifiers, backups), MAX_RETRIES);

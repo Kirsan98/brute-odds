@@ -17,6 +17,37 @@ describe('simulateOnce', () => {
   });
 });
 
+describe('renfort', () => {
+  const moi = makeBrute({ level: 20, skills: ['backup'] as never, hpValue: 100, strengthValue: 10 });
+  const foe = makeBrute({
+    level: 20, hpValue: 200, strengthValue: 25, speedValue: 15, agilityValue: 15,
+  });
+  const nul = makeBrute({
+    level: 1, hpValue: 5, strengthValue: 1, speedValue: 1, agilityValue: 1,
+  });
+  const colosse = makeBrute({
+    level: 19, hpValue: 600, strengthValue: 120, speedValue: 40, agilityValue: 40,
+  });
+
+  const tauxAvec = (pool: ReturnType<typeof makeBrute>[]) => Array
+    .from({ length: 400 }, () => simulateOnce(moi, foe, {}, { own: pool }))
+    .filter((r) => r === 'win').length / 400;
+
+  // Le serveur retire un renfort à chaque combat. Tirer une seule fois pour toutes les
+  // simulations rendrait le taux du vivier égal à celui de l'un des deux renforts ;
+  // il doit au contraire tomber entre les deux.
+  it('retire un renfort par combat, pas un pour toute l\'estimation', () => {
+    const avecNul = tauxAvec([nul]);
+    const avecColosse = tauxAvec([colosse]);
+    const avecLesDeux = tauxAvec([nul, colosse]);
+
+    expect(avecNul).toBeLessThan(0.05);
+    expect(avecColosse).toBeGreaterThan(0.6);
+    expect(avecLesDeux).toBeGreaterThan(0.2);
+    expect(avecLesDeux).toBeLessThan(0.55);
+  });
+});
+
 describe('retry', () => {
   it('renvoie le résultat dès qu\'un appel réussit, sans épuiser les tentatives', () => {
     const fn = vi.fn()

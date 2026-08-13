@@ -1,12 +1,12 @@
 import { simulateOnce } from '../engine/simulateOnce.js';
-import type { RawBrute } from '../engine/types.js';
+import type { BackupPools, RawBrute } from '../engine/types.js';
 import type { Modifiers } from '@labrute/core';
 
 export type FightInput = {
   brute: RawBrute;
   opponent: RawBrute;
   modifiers: Modifiers;
-  backups?: { own?: RawBrute; opponent?: RawBrute };
+  backups?: BackupPools;
   approximate?: boolean;
 };
 
@@ -19,7 +19,7 @@ export type Estimation = {
 
 export type Simulator = (
   brute: RawBrute, opponent: RawBrute, modifiers: Modifiers,
-  backups: { own?: RawBrute; opponent?: RawBrute },
+  backups: BackupPools,
 ) => 'win' | 'loss';
 
 export const estimate = (

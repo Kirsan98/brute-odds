@@ -31,6 +31,8 @@ const onArena = async (bruteName: string) => {
   opponents.forEach((opponent) => renderOdds(opponent.name, 'pending'));
 
   for (const opponent of opponents) {
+    // Les viviers de renfort, pas les renforts : le tirage se fait combat par combat,
+    // dans le worker.
     const backups = await resolveBackups(brute, opponent, {
       ownBrutes: () => store.getOwnBrutes(),
       fetchProfileBrutes,
