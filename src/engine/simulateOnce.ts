@@ -1,4 +1,4 @@
-import { getCalculatedBrute, type Modifiers } from '@labrute/core';
+import { getCalculatedBrute, StepType, type Modifiers } from '@labrute/core';
 import { getFighters } from '../../vendor/labrute/server/src/utils/fight/getFighters.js';
 import {
   checkDeaths, fighterArrives, orderFighters, playFighterTurn, saboteur,
@@ -8,6 +8,20 @@ import type { DetailedFight } from '../../vendor/labrute/server/src/utils/fight/
 import type { RawBrute } from './types.js';
 
 const MAX_RETRIES = 10;
+
+/** Appelle `fn` jusqu'à `times` fois ; renvoie le premier résultat obtenu sans exception,
+ *  ou relève la dernière erreur si toutes les tentatives ont échoué. */
+export const retry = <T>(fn: () => T, times: number): T => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < times; attempt += 1) {
+    try {
+      return fn();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+};
 
 const runFight = (
   brute: RawBrute, opponent: RawBrute, modifiers: Modifiers,
@@ -31,7 +45,7 @@ const runFight = (
     clanFight: false,
   });
 
-  const fightData = {
+  const fightData: DetailedFight = {
     modifiers,
     fighters,
     initialFighters: [],
@@ -40,7 +54,7 @@ const runFight = (
     winner: null,
     loser: null,
     overtime: false,
-  } as unknown as DetailedFight;
+  };
 
   const stats = {};
   const achievements = {};
@@ -67,7 +81,11 @@ const runFight = (
     if (turn > 1000) fightData.overtime = true;
     playFighterTurn(fightData, stats, achievements);
     checkDeaths(fightData, stats);
-    fightData.steps.length = 0; // on ne consomme pas les animations
+    // On ne consomme pas les animations, mais checkDeaths() se sert de fightData.steps
+    // pour savoir si un combattant a déjà son step de mort (fightMethods.ts:2020-2021) :
+    // il faut donc conserver les steps Death d'un tour sur l'autre, sous peine de les
+    // dupliquer et de fausser les stats qui en dépendent.
+    fightData.steps = fightData.steps.filter((s) => s.a === StepType.Death);
     turn += 1;
   }
 
@@ -82,14 +100,4 @@ const runFight = (
 export const simulateOnce = (
   brute: RawBrute, opponent: RawBrute, modifiers: Modifiers,
   backups: { own?: RawBrute; opponent?: RawBrute } = {},
-): 'win' | 'loss' => {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
-    try {
-      return runFight(brute, opponent, modifiers, backups);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError;
-};
+): 'win' | 'loss' => retry(() => runFight(brute, opponent, modifiers, backups), MAX_RETRIES);
