@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
-import { formatOdds, renderOdds } from '../../src/userscript/inject.js';
+import {
+  beforeEach, describe, expect, it, vi,
+} from 'vitest';
+import { formatOdds, renderOdds, resetPending } from '../../src/userscript/inject.js';
 
 describe('affichage', () => {
   beforeEach(() => {
+    resetPending();
     document.body.innerHTML = `
       <div class="MuiGrid-item"><span>Adversaire1</span></div>
       <div class="MuiGrid-item"><span>Adversaire2</span></div>`;
@@ -48,6 +51,22 @@ describe('affichage', () => {
   it('ignore un nom absent de la page sans lever', () => {
     expect(() => renderOdds('Inconnu', 'pending')).not.toThrow();
     expect(document.querySelectorAll('.brute-odds').length).toBe(0);
+  });
+
+  // La page rend ses cartes après la réponse réseau qu'on intercepte : au premier
+  // appel, la carte de l'adversaire n'existe pas encore.
+  it('peint la carte dès qu\'elle apparaît, même demandée trop tôt', async () => {
+    document.body.innerHTML = '';
+    renderOdds('Tardif', {
+      winRate: 0.42, ci: 0.02, samples: 1000, approximate: false,
+    });
+    expect(document.querySelectorAll('.brute-odds').length).toBe(0);
+
+    document.body.innerHTML = '<div class="MuiGrid-item"><span>Tardif</span></div>';
+
+    await vi.waitFor(() => {
+      expect(document.querySelector('.brute-odds')?.textContent).toBe('42 % ± 2');
+    });
   });
 
   it('ne confond pas un nom avec un nom plus long qui le contient', () => {
