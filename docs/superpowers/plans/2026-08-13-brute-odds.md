@@ -70,7 +70,8 @@ mkdir -p "$DEST"
 git -C "$DEST" init -q
 git -C "$DEST" remote add origin "$UPSTREAM_URL"
 git -C "$DEST" config core.sparseCheckout true
-printf '%s\n' 'core/' 'prisma/' 'server/src/utils/' > "$DEST/.git/info/sparse-checkout"
+# LICENSE est indispensable : la tâche 10 en a besoin pour l'attribution.
+printf '%s\n' 'core/' 'prisma/' 'server/src/utils/' 'LICENSE' > "$DEST/.git/info/sparse-checkout"
 git -C "$DEST" fetch --depth 1 origin "$UPSTREAM_SHA" -q
 git -C "$DEST" checkout -q FETCH_HEAD
 echo "Moteur vendorisé depuis $UPSTREAM_SHA"
@@ -568,12 +569,13 @@ console.log(`6 adversaires x 1000 simulations = ${(perFight * 6000 / 1000).toFix
 ```
 
 ```bash
-npm pkg set scripts.bench="vitest run --testTimeout=0 scripts/bench.ts || npx tsx scripts/bench.ts"
+npm i -D tsx
+npm pkg set scripts.bench="tsx scripts/bench.ts"
 ```
 
 - [ ] **Step 2: Mesurer**
 
-Run: `npx tsx scripts/bench.ts`
+Run: `npm run bench`
 Noter le coût réel par combat.
 
 - [ ] **Step 3: Choisir N et l'écrire dans `src/odds/config.ts`**
@@ -838,6 +840,7 @@ git commit -m "feat(userscript): interception réseau et cache indexé par brute
 
 **Files:**
 - Create: `src/userscript/resolveBackups.ts`
+- Modify: `src/userscript/intercept.ts` (ajout de `fetchProfileBrutes`, étape 4)
 - Test: `tests/userscript/resolveBackups.test.ts`
 
 **Interfaces:**
@@ -1038,9 +1041,19 @@ export const formatOdds = (e: Estimation): string => {
     : `${pct} % ± ${ci}`;
 };
 
+// Correspondance exacte sur un nœud de texte : `includes` confondrait
+// « Sam » avec « Sam2 » et afficherait le score sur la mauvaise carte.
 const findCard = (name: string): Element | null => {
-  const nodes = Array.from(document.querySelectorAll('.MuiGrid-item'));
-  return nodes.find((n) => n.textContent?.includes(name)) ?? null;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if (node.textContent?.trim() === name) {
+      const card = (node.parentElement as Element | null)?.closest('.MuiGrid-item');
+      if (card) return card;
+    }
+    node = walker.nextNode();
+  }
+  return null;
 };
 
 export const renderOdds = (name: string, estimation: Estimation | 'pending') => {
