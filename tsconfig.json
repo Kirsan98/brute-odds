@@ -14,8 +14,10 @@
       "@labrute/core": ["./vendor/labrute/core/src/index.ts"],
       // Le moteur importe aussi des chemins profonds (`@labrute/core/src/brute/bosses.js`).
       "@labrute/core/*": ["./vendor/labrute/core/*"],
-      // Vitest et esbuild visent `index-browser.js` (les enums, exécutables hors serveur) ;
-      // `tsc` vise sa déclaration, seule à porter les types du modèle `Brute`.
+      // Le paquet a deux visages : `index-browser.js` porte les enums exécutables hors
+      // serveur, `index.d.ts` porte les types du modèle `Brute`. Ce fichier ne sert qu'à
+      // `tsc`, qui n'exécute rien : il vise les types. Les outils qui exécutent visent
+      // le navigateur — vitest.config.ts, scripts/build.mjs, tsconfig.runtime.json.
       "@labrute/prisma": ["./vendor/labrute/prisma/index.d.ts"]
     }
   },

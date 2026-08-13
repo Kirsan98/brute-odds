@@ -9,7 +9,7 @@
   "scripts": {
     "test": "vitest run",
     "vendor": "bash scripts/vendor.sh",
-    "bench": "tsx scripts/bench.ts",
+    "bench": "tsx --tsconfig tsconfig.runtime.json scripts/bench.ts",
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs"
   },

@@ -1,0 +1,14 @@
+{
+  // Pour les outils qui *exécutent* le code TypeScript (tsx, via `npm run bench`).
+  // `tsconfig.json` fait pointer `@labrute/prisma` sur ses déclarations, ce qui convient
+  // à `tsc` mais ne s'exécute pas : on rebranche ici la face navigateur du paquet, la
+  // même que celle visée par vitest.config.ts et scripts/build.mjs.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@labrute/core": ["./vendor/labrute/core/src/index.ts"],
+      "@labrute/core/*": ["./vendor/labrute/core/*"],
+      "@labrute/prisma": ["./vendor/labrute/prisma/index-browser.js"]
+    }
+  }
+}
