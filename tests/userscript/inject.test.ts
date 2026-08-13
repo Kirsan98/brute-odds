@@ -72,6 +72,40 @@ describe('affichage', () => {
     });
   });
 
+  // Observé en vrai : le badge visait un conteneur qui regroupait plusieurs
+  // adversaires, et chaque nouveau chassait le précédent.
+  it('vise la carte de l\'adversaire, pas le conteneur qui en regroupe plusieurs', () => {
+    document.body.innerHTML = `
+      <div class="colonne">
+        <div class="carte"><span><b>Un</b></span></div>
+        <div class="carte"><span><b>Deux</b></span></div>
+      </div>`;
+    const e = {
+      winRate: 0.42, ci: 0.02, samples: 1000, approximate: false,
+    };
+    renderOdds('Un', e);
+    renderOdds('Deux', { ...e, winRate: 0.55 });
+
+    expect(document.querySelectorAll('.colonne > .brute-odds').length).toBe(0);
+    const cartes = document.querySelectorAll('.carte');
+    expect(cartes[0]?.textContent).toContain('42 %');
+    expect(cartes[1]?.textContent).toContain('55 %');
+    expect(document.querySelectorAll('.brute-odds').length).toBe(2);
+  });
+
+  // Le badge glissait derrière la carte de la rangée suivante, opaque et peinte après.
+  it('pose le badge hors du flux, au-dessus de ses voisins', () => {
+    renderOdds('Adversaire1', {
+      winRate: 0.42, ci: 0.02, samples: 1000, approximate: false,
+    });
+    const badge = document.querySelector('.brute-odds') as HTMLElement;
+
+    expect(badge.style.position).toBe('absolute');
+    expect(badge.style.zIndex).not.toBe('');
+    // Sans repère positionné, `absolute` remonterait jusqu'à la page entière.
+    expect((badge.parentElement as HTMLElement).style.position).toBe('relative');
+  });
+
   // Observé en vrai : sur 6 adversaires, 4 badges disparaissaient — la page se
   // redessinait par-dessus, et seuls les 2 derniers arrivaient après.
   it('repose le badge que la page a effacé en se redessinant', async () => {

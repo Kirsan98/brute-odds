@@ -26,9 +26,11 @@ const onArena = async (bruteName: string) => {
   const opponents = store.getOpponents(bruteName);
   if (!brute || !opponents) return;
 
-  for (const opponent of opponents) {
-    renderOdds(opponent.name, 'pending');
+  // Tous les noms d'abord : c'est en les connaissant tous qu'on sait délimiter la
+  // carte de chacun, et les six adversaires affichent leur attente sans délai.
+  opponents.forEach((opponent) => renderOdds(opponent.name, 'pending'));
 
+  for (const opponent of opponents) {
     const backups = await resolveBackups(brute, opponent, {
       ownBrutes: () => store.getOwnBrutes(),
       fetchProfileBrutes,
