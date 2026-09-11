@@ -94,7 +94,13 @@ const badgesFor = (name: string) => [...document.querySelectorAll('.brute-odds')
 
 const paint = (name: string, displayed: Displayed) => {
   const card = findCard(name, shown.keys());
-  if (!card) return;
+  if (!card) {
+    // La carte a disparu : le badge qui lui survivrait resterait collé là où la page
+    // l'a laissé, et c'est ce qu'on a vu, un pourcentage d'arène en bas d'une page de
+    // montée de niveau.
+    badgesFor(name).forEach((badge) => badge.remove());
+    return;
+  }
 
   const best = name === bestName;
   const text = label(displayed, best);
@@ -142,15 +148,27 @@ const shown = new Map<string, Displayed>();
 const titled = new Map<string, Element>();
 /** L'adversaire à combattre, une fois les six situés. */
 let bestName: string | undefined;
+/** La page où les badges ont été posés. Le jeu est une application d'une seule page :
+ *  elle change de vue sans recharger, et rien ne nous prévient qu'on a quitté l'arène. */
+let paintedPath = '';
 let observer: MutationObserver | undefined;
 
-const repaintAll = () => shown.forEach((displayed, name) => paint(name, displayed));
+const repaintAll = () => {
+  // Changer de vue vide l'ardoise : les chances d'un adversaire d'arène n'ont aucun
+  // sens ailleurs, et l'observateur nous réveille à chaque redessin de la page.
+  if (location.pathname !== paintedPath) {
+    resetOdds();
+    return;
+  }
+  shown.forEach((displayed, name) => paint(name, displayed));
+};
 
 /** Affiche l'estimation sur la carte de `name`, et la remet en place tant qu'on est là.
  *  Deux raisons : on lit la réponse réseau avant que la page ait rendu ses cartes, et
  *  React redessine ensuite quand bon lui semble, emportant des badges qu'il n'a pas
  *  créés. Peindre une seule fois perdait la moitié des résultats. */
 export const renderOdds = (name: string, displayed: Displayed) => {
+  paintedPath = location.pathname;
   shown.set(name, displayed);
   // Tout repeindre, pas seulement `name` : un nom de plus affine la carte des autres.
   repaintAll();
@@ -173,8 +191,11 @@ export const renderBest = (name: string | undefined) => {
  *  `document` que les tests ont remplacé. */
 export const resetOdds = () => {
   shown.clear();
+  titled.forEach((card) => card.removeAttribute('title'));
   titled.clear();
+  document.querySelectorAll('.brute-odds').forEach((badge) => badge.remove());
   bestName = undefined;
+  paintedPath = '';
   observer?.disconnect();
   observer = undefined;
 };

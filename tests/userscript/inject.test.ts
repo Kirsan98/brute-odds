@@ -207,6 +207,34 @@ describe('affichage', () => {
       .toContain('combats simulés');
   });
 
+  // Vu en vrai : un pourcentage d'arène restait collé en bas de la page de montée de
+  // niveau, la carte ayant disparu sans emporter le badge.
+  it('retire le badge dont la carte a disparu', async () => {
+    renderOdds('Adversaire1', estimation());
+    expect(document.querySelectorAll('.brute-odds')).toHaveLength(1);
+
+    document.body.innerHTML = '<div>une autre vue, sans cet adversaire</div>';
+
+    await vi.waitFor(() => {
+      expect(document.querySelectorAll('.brute-odds')).toHaveLength(0);
+    });
+  });
+
+  it('vide l\'ardoise quand la page change de vue', async () => {
+    renderOdds('Adversaire1', estimation());
+    expect(document.querySelectorAll('.brute-odds')).toHaveLength(1);
+
+    window.history.pushState({}, '', '/Sam/level-up');
+    document.body.appendChild(document.createElement('div'));
+
+    await vi.waitFor(() => {
+      expect(document.querySelectorAll('.brute-odds')).toHaveLength(0);
+    });
+
+    // Et la carte d'origine ne garde pas son infobulle.
+    expect(document.querySelectorAll('[title]')).toHaveLength(0);
+  });
+
   it('ne confond pas un nom avec un nom plus long qui le contient', () => {
     document.body.innerHTML = `
       <div class="MuiGrid-item"><span>Sam2</span></div>
