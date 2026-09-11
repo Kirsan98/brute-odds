@@ -6,6 +6,10 @@ import { store } from './store.js';
 
 const OPPONENTS = /\/api\/brute\/([^/]+)\/get-opponents\//;
 const HOOK = /\/api\/brute\/([^/]+)\/for-hook/;
+// Ancré sur la fin : `/level-up` est un préfixe de `/level-up-choices`, et un simple
+// `includes` faisait passer les deux destins proposés pour une brute à mettre en cache.
+// Le conseil de montée de niveau ne pouvait alors jamais se déclencher.
+const LEVEL_UP = /\/api\/brute\/[^/]+\/level-up(?:$|\?)/;
 
 export type Hooks = {
   onArena: (bruteName: string) => void;
@@ -38,7 +42,7 @@ export const installInterceptor = (hooks: Hooks) => {
         store.putModifiers(data.modifiers);
       } else if (HOOK.test(url)) {
         store.putBrutes([await response.clone().json()]);
-      } else if (url.includes('/level-up')) {
+      } else if (LEVEL_UP.test(url)) {
         store.putBrutes([await response.clone().json()]);
       } else {
         const match = OPPONENTS.exec(url);

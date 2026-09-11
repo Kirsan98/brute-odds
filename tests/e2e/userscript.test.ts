@@ -119,11 +119,18 @@ describe('userscript de bout en bout', () => {
       expect(document.querySelectorAll('.brute-odds')).toHaveLength(2);
     }, { timeout: 10000 });
 
-    réseau.mockResolvedValueOnce(json([
-      { type: 'stats', stat1: 'strength', stat1Value: 2 },
-      { type: 'stats', stat1: 'hp', stat1Value: 12 },
-    ]));
-    await fetch('https://brute.eternaltwin.org/api/brute/Sam/get-level-up-choices');
+    // Et la vraie forme : `{ choices: [DestinyChoice, DestinyChoice] }`
+    // (BrutesGetLevelUpChoicesResponse).
+    réseau.mockResolvedValueOnce(json({
+      choices: [
+        { type: 'stats', stat1: 'strength', stat1Value: 2 },
+        { type: 'stats', stat1: 'hp', stat1Value: 12 },
+      ],
+    }));
+    // La vraie route du jeu (client/src/utils/Server.ts). L'inventer avait coûté cher :
+    // `/level-up-choices` était avalé par la branche `/level-up` et le conseil ne
+    // s'affichait jamais, alors que ce test passait.
+    await fetch('https://brute.eternaltwin.org/api/brute/Sam/level-up-choices');
 
     await vi.waitFor(() => {
       const panneau = document.getElementById('brute-odds-panel');

@@ -98,6 +98,40 @@ describe('installInterceptor', () => {
     await expect(fetch('https://labrute.example/api/brute/Sam/get-opponents/1')).resolves.toBeInstanceOf(Response);
   });
 
+  // `/level-up` est un préfixe de `/level-up-choices` : un `includes` faisait passer
+  // les deux destins proposés pour une brute, et le conseil ne se déclenchait jamais.
+  it('ne confond pas la montée de niveau avec les destins proposés', async () => {
+    const choices = [
+      { type: 'stats', stat1: 'agility', stat1Value: 2 },
+      { type: 'stats', stat1: 'hp', stat1Value: 6, stat2: 'strength', stat2Value: 1 },
+    ];
+    stubGameFetch(vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ choices }),
+      { headers: { 'content-type': 'application/json' } },
+    )));
+    const onLevelUpChoices = vi.fn();
+    installInterceptor({ onArena: vi.fn(), onLevelUpChoices });
+
+    await fetch('https://labrute.example/api/brute/Sam/level-up-choices');
+
+    expect(onLevelUpChoices).toHaveBeenCalledWith('Sam', choices);
+    // Et surtout : rien de tout cela n'a été pris pour une brute.
+    expect(store.getBrute('Sam')).toBeUndefined();
+  });
+
+  it('met bien en cache la brute que rend la montée de niveau elle-même', async () => {
+    stubGameFetch(vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(makeBrute({ name: 'Sam', level: 16 }))),
+    ));
+    const onLevelUpChoices = vi.fn();
+    installInterceptor({ onArena: vi.fn(), onLevelUpChoices });
+
+    await fetch('https://labrute.example/api/brute/Sam/level-up');
+
+    expect(store.getBrute('Sam')?.level).toBe(16);
+    expect(onLevelUpChoices).not.toHaveBeenCalled();
+  });
+
   // L'URL du combat n'est pas connue et peut changer : c'est la forme de la réponse
   // qui la trahit. Sans cela, aucune calibration n'est possible.
   it('reconnaît le résultat d\'un combat quelle que soit son URL', async () => {
