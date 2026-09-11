@@ -1,0 +1,52 @@
+name: Veille du moteur amont
+
+# Le moteur est épinglé à un SHA. Quand le jeu change ses règles de combat, nos
+# estimations parlent d'un jeu qui n'existe plus, et rien ne le signalait.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: compare
+        run: |
+          pinned=$(grep -oP 'UPSTREAM_SHA="\K[0-9a-f]+' scripts/vendor.sh)
+          url=$(grep -oP 'UPSTREAM_URL="\K[^"]+' scripts/vendor.sh)
+          latest=$(git ls-remote "$url" main | cut -f1)
+          echo "pinned=$pinned" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "drifted=$([ "$pinned" = "$latest" ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+
+      - if: steps.compare.outputs.drifted == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PINNED: ${{ steps.compare.outputs.pinned }}
+          LATEST: ${{ steps.compare.outputs.latest }}
+        run: |
+          titre="Le moteur amont a bougé"
+          # Une seule issue ouverte à la fois : on met à jour la sienne plutôt que d'en
+          # empiler une par semaine.
+          existante=$(gh issue list --state open --search "$titre in:title" --json number --jq '.[0].number')
+          corps=$(printf '%s\n' \
+            "Le SHA épinglé dans \`scripts/vendor.sh\` n'est plus celui de \`main\` en amont." \
+            "" \
+            "- épinglé : \`$PINNED\`" \
+            "- amont   : \`$LATEST\`" \
+            "" \
+            "Pour resynchroniser : changer \`UPSTREAM_SHA\`, puis \`npm run vendor && npm test\`." \
+            "Un échec du test en or est un vrai échec : il dit que la simulation ne décrit" \
+            "plus le jeu, pas qu'il faut ajuster l'assertion.")
+          if [ -n "$existante" ]; then
+            gh issue comment "$existante" --body "$corps"
+          else
+            gh issue create --title "$titre" --body "$corps"
+          fi

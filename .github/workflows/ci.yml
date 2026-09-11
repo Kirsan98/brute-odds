@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Le moteur n'est pas versionné : sans cette étape, il n'y a rien à typer ni à
+      # tester. C'est aussi ce qui fait de la CI une vérification du script de
+      # vendorisation lui-même.
+      - run: npm run vendor
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      # Le build est le livrable : s'il casse, le userscript n'existe plus.
+      - run: npm run build
