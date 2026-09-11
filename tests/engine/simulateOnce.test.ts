@@ -5,14 +5,17 @@ import { makeBrute } from '../fixtures/makeBrute.js';
 describe('simulateOnce', () => {
   it('rend un vainqueur pour deux brutes identiques', () => {
     const result = simulateOnce(makeBrute(), makeBrute(), {});
-    expect(['win', 'loss']).toContain(result);
+    expect(['win', 'loss']).toContain(result.result);
+    expect(result.turns).toBeGreaterThan(0);
+    expect(result.hpLeft).toBeGreaterThanOrEqual(0);
+    expect(result.hpLeft).toBeLessThanOrEqual(1);
   });
 
   it('donne un avantage net à une brute très supérieure', () => {
     const faible = makeBrute({ strengthValue: 1, hpValue: 20, speedValue: 1, agilityValue: 1 });
     const fort = makeBrute({ strengthValue: 100, hpValue: 500, speedValue: 100, agilityValue: 100 });
     const victoires = Array.from({ length: 50 }, () => simulateOnce(fort, faible, {}))
-      .filter((r) => r === 'win').length;
+      .filter((r) => r.result === 'win').length;
     expect(victoires).toBeGreaterThan(40);
   });
 });
@@ -31,7 +34,7 @@ describe('renfort', () => {
 
   const tauxAvec = (pool: ReturnType<typeof makeBrute>[]) => Array
     .from({ length: 400 }, () => simulateOnce(moi, foe, {}, { own: pool }))
-    .filter((r) => r === 'win').length / 400;
+    .filter((r) => r.result === 'win').length / 400;
 
   // Le serveur retire un renfort à chaque combat. Tirer une seule fois pour toutes les
   // simulations rendrait le taux du vivier égal à celui de l'un des deux renforts ;

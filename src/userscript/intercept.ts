@@ -1,10 +1,26 @@
 import type { RawBrute } from '../engine/types.js';
+import type { LevelUpChoice } from '@labrute/core';
+import { asFightResult, type FightResult } from './fightResult.js';
+import { asLevelUpChoices, bruteNameIn } from './levelUpChoices.js';
 import { store } from './store.js';
 
 const OPPONENTS = /\/api\/brute\/([^/]+)\/get-opponents\//;
 const HOOK = /\/api\/brute\/([^/]+)\/for-hook/;
+// Ancré sur la fin : `/level-up` est un préfixe de `/level-up-choices`, et un simple
+// `includes` faisait passer les deux destins proposés pour une brute à mettre en cache.
+// Le conseil de montée de niveau ne pouvait alors jamais se déclencher.
+const LEVEL_UP = /\/api\/brute\/[^/]+\/level-up(?:$|\?)/;
 
-export const installInterceptor = (onArena: (bruteName: string) => void) => {
+export type Hooks = {
+  onArena: (bruteName: string) => void;
+  /** Le résultat d'un vrai combat, reconnu à sa forme et non à son URL : c'est ce qui
+   *  permet de confronter nos annonces à ce que le jeu a réellement produit. */
+  onFight?: (fight: FightResult) => void;
+  /** Les deux destins proposés à la montée de niveau. */
+  onLevelUpChoices?: (bruteName: string, choices: LevelUpChoice[]) => void;
+};
+
+export const installInterceptor = (hooks: Hooks) => {
   const original = window.fetch;
 
   window.fetch = async (...args: Parameters<typeof fetch>) => {
@@ -26,14 +42,27 @@ export const installInterceptor = (onArena: (bruteName: string) => void) => {
         store.putModifiers(data.modifiers);
       } else if (HOOK.test(url)) {
         store.putBrutes([await response.clone().json()]);
-      } else if (url.includes('/level-up')) {
+      } else if (LEVEL_UP.test(url)) {
         store.putBrutes([await response.clone().json()]);
       } else {
         const match = OPPONENTS.exec(url);
         if (match?.[1]) {
           const bruteName = decodeURIComponent(match[1]);
           store.putOpponents(bruteName, await response.clone().json());
-          onArena(bruteName);
+          hooks.onArena(bruteName);
+        } else if (url.includes('/api/')
+          && response.headers.get('content-type')?.includes('json')) {
+          // On ne connaît ni l'URL du combat ni celle des choix de destin, et elles
+          // peuvent changer : on regarde la forme de la réponse. Ce qui n'est ni l'un
+          // ni l'autre est simplement ignoré.
+          const data = await response.clone().json();
+
+          const fight = asFightResult(data);
+          if (fight) hooks.onFight?.(fight);
+
+          const choices = asLevelUpChoices(data);
+          const bruteName = bruteNameIn(url);
+          if (choices && bruteName) hooks.onLevelUpChoices?.(bruteName, choices);
         }
       }
     } catch {

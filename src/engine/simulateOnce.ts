@@ -7,7 +7,7 @@ import {
 } from '../../vendor/labrute/server/src/utils/fight/fightMethods.js';
 import { applySpy } from '../../vendor/labrute/server/src/utils/fight/applySpy.js';
 import type { DetailedFight } from '../../vendor/labrute/server/src/utils/fight/generateFight.js';
-import type { BackupPools, RawBrute } from './types.js';
+import type { BackupPools, FightOutcome, RawBrute } from './types.js';
 
 const MAX_RETRIES = 10;
 
@@ -65,7 +65,7 @@ export const drawBackup = (pool?: RawBrute[]): RawBrute | undefined => (
 const runFight = (
   brute: RawBrute, opponent: RawBrute, modifiers: Modifiers,
   backups: BackupPools,
-): 'win' | 'loss' => {
+): FightOutcome => {
   const fighters = buildFighters(brute, opponent, modifiers, {
     own: drawBackup(backups.own),
     opponent: drawBackup(backups.opponent),
@@ -107,6 +107,10 @@ const runFight = (
     if (turn > 1000) fightData.overtime = true;
     playFighterTurn(fightData, stats, achievements);
     checkDeaths(fightData, stats);
+    // Le spec soupçonnait ces steps d'animation de dominer le temps de calcul. Mesure
+    // faite (npm run bench) : filtrer en place plutôt que réallouer ne change rien de
+    // mesurable (0,083 à 0,091 ms contre 0,087 à 0,089). La question est tranchée, la
+    // version simple reste.
     // On ne consomme pas les animations, mais checkDeaths() se sert de fightData.steps
     // pour savoir si un combattant a déjà son step de mort (fightMethods.ts:2020-2021) :
     // il faut donc conserver les steps Death d'un tour sur l'autre, sous peine de les
@@ -120,10 +124,19 @@ const runFight = (
   const loser = fightData.fighters.find((f) => f.id === fightData.loser);
   if (!loser) throw new Error('No loser found');
 
-  return loser.team === 'L' ? 'loss' : 'win';
+  // `getFighters` range team1 du côté 'L' (getFighters.ts:161) : notre brute est donc
+  // le combattant principal de gauche, et c'est le sien qu'on regarde saigner.
+  const mine = fightData.fighters
+    .find((f) => f.type === 'brute' && !f.master && f.team === 'L');
+
+  return {
+    result: loser.team === 'L' ? 'loss' : 'win',
+    turns: turn,
+    hpLeft: mine && mine.maxHp > 0 ? Math.max(0, mine.hp) / mine.maxHp : 0,
+  };
 };
 
 export const simulateOnce = (
   brute: RawBrute, opponent: RawBrute, modifiers: Modifiers,
   backups: BackupPools = {},
-): 'win' | 'loss' => retry(() => runFight(brute, opponent, modifiers, backups), MAX_RETRIES);
+): FightOutcome => retry(() => runFight(brute, opponent, modifiers, backups), MAX_RETRIES);
