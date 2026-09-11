@@ -11,9 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node 22 et pas 20 : jsdom 30 exige `^22.22.2 || ^24.15.0 || >=26`, et undici 8
+      # qu'il entraîne appelle `worker_threads.markAsUncloneable`, absent avant 22.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
