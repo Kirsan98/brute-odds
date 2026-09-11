@@ -6,6 +6,8 @@ import type { WorkerRequest } from '../worker/protocol.js';
 import { createArenaHandler } from './orchestrate.js';
 import { createCalibrationLog } from './calibrationLog.js';
 import { createOpponentPool } from './opponentPool.js';
+import { createAdvisor } from './advise.js';
+import { renderAdvice } from './panel.js';
 
 // Remplacé au build par le code du worker, inséré comme chaîne (scripts/build.mjs) :
 // un userscript est un fichier unique, il n'a pas de second fichier à charger.
@@ -45,11 +47,22 @@ const onArena = createArenaHandler({
   onPrediction: calibration.remember,
 });
 
+// Le conseil de montée de niveau : la seule décision du jeu qui ne se rattrape pas.
+const onLevelUp = createAdvisor({
+  getBrute: (name) => store.getBrute(name),
+  getOpponents: (name) => store.getOpponents(name),
+  getModifiers: () => store.getModifiers(),
+  sampleOpponents: opponents.sample,
+  run,
+  render: renderAdvice,
+});
+
 installInterceptor({
   onArena: (bruteName) => {
     opponents.remember(store.getOpponents(bruteName) ?? []);
     void onArena(bruteName);
   },
+  onLevelUpChoices: (bruteName, choices) => { void onLevelUp(bruteName, choices); },
   onFight: (fight) => {
     const recorded = calibration.record(fight);
     if (!recorded) return;

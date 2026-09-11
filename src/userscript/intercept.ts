@@ -1,5 +1,7 @@
 import type { RawBrute } from '../engine/types.js';
+import type { LevelUpChoice } from '@labrute/core';
 import { asFightResult, type FightResult } from './fightResult.js';
+import { asLevelUpChoices, bruteNameIn } from './levelUpChoices.js';
 import { store } from './store.js';
 
 const OPPONENTS = /\/api\/brute\/([^/]+)\/get-opponents\//;
@@ -10,6 +12,8 @@ export type Hooks = {
   /** Le résultat d'un vrai combat, reconnu à sa forme et non à son URL : c'est ce qui
    *  permet de confronter nos annonces à ce que le jeu a réellement produit. */
   onFight?: (fight: FightResult) => void;
+  /** Les deux destins proposés à la montée de niveau. */
+  onLevelUpChoices?: (bruteName: string, choices: LevelUpChoice[]) => void;
 };
 
 export const installInterceptor = (hooks: Hooks) => {
@@ -42,12 +46,19 @@ export const installInterceptor = (hooks: Hooks) => {
           const bruteName = decodeURIComponent(match[1]);
           store.putOpponents(bruteName, await response.clone().json());
           hooks.onArena(bruteName);
-        } else if (hooks.onFight && url.includes('/api/')
+        } else if (url.includes('/api/')
           && response.headers.get('content-type')?.includes('json')) {
-          // On ne connaît pas l'URL du combat, et elle peut changer : on regarde la
-          // forme de la réponse. Un objet qui n'est pas un combat est simplement ignoré.
-          const fight = asFightResult(await response.clone().json());
-          if (fight) hooks.onFight(fight);
+          // On ne connaît ni l'URL du combat ni celle des choix de destin, et elles
+          // peuvent changer : on regarde la forme de la réponse. Ce qui n'est ni l'un
+          // ni l'autre est simplement ignoré.
+          const data = await response.clone().json();
+
+          const fight = asFightResult(data);
+          if (fight) hooks.onFight?.(fight);
+
+          const choices = asLevelUpChoices(data);
+          const bruteName = bruteNameIn(url);
+          if (choices && bruteName) hooks.onLevelUpChoices?.(bruteName, choices);
         }
       }
     } catch {

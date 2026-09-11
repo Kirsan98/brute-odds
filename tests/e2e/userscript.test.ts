@@ -111,6 +111,29 @@ describe('userscript de bout en bout', () => {
     }, { timeout: 10000 });
   }, 15000);
 
+  // La détection des destins est la partie la plus spéculative du script : elle ne
+  // s'appuie sur aucune URL connue, seulement sur la forme des données.
+  it('conseille un destin quand le jeu en propose deux', async () => {
+    await jouerLArène();
+    await vi.waitFor(() => {
+      expect(document.querySelectorAll('.brute-odds')).toHaveLength(2);
+    }, { timeout: 10000 });
+
+    réseau.mockResolvedValueOnce(json([
+      { type: 'stats', stat1: 'strength', stat1Value: 2 },
+      { type: 'stats', stat1: 'hp', stat1Value: 12 },
+    ]));
+    await fetch('https://brute.eternaltwin.org/api/brute/Sam/get-level-up-choices');
+
+    await vi.waitFor(() => {
+      const panneau = document.getElementById('brute-odds-panel');
+      expect(panneau?.textContent).toContain('Montée de niveau de Sam');
+      expect(panneau?.textContent).toContain('+2 strength');
+      expect(panneau?.textContent).toContain('+12 hp');
+      expect(panneau?.textContent).toContain('à prendre');
+    }, { timeout: 20000 });
+  }, 30000);
+
   it('confronte l\'annonce au résultat du vrai combat', async () => {
     await jouerLArène();
     await vi.waitFor(() => {
