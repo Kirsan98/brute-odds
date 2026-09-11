@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installInterceptor } from '../../src/userscript/intercept.js';
 import { store } from '../../src/userscript/store.js';
 import { makeBrute } from '../fixtures/makeBrute.js';
+import realFight from '../fixtures/real-fight.json' with { type: 'json' };
 
 // `installInterceptor` patche `window.fetch`. L'environnement Node de vitest
 // ne fournit pas ce global navigateur : on le simule ici, uniquement côté
@@ -26,7 +27,7 @@ describe('installInterceptor', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify([makeBrute({ name: 'AdvB' })])));
     stubGameFetch(fetchMock);
     const onArena = vi.fn();
-    installInterceptor(onArena);
+    installInterceptor({ onArena });
 
     await fetch('https://labrute.example/api/brute/SamIsGuey/get-opponents/12');
     await fetch('https://labrute.example/api/brute/AutreBrute/get-opponents/5');
@@ -41,7 +42,7 @@ describe('installInterceptor', () => {
     const name = 'Sam Brute'; // l'espace est encodé en %20 dans l'URL réelle
     stubGameFetch(vi.fn().mockResolvedValue(new Response(JSON.stringify([makeBrute({ name: 'Adv' })]))));
     const onArena = vi.fn();
-    installInterceptor(onArena);
+    installInterceptor({ onArena });
 
     await fetch(`https://labrute.example/api/brute/${encodeURIComponent(name)}/get-opponents/1`);
 
@@ -55,7 +56,7 @@ describe('installInterceptor', () => {
     stubGameFetch(vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ user: { brutes: own }, modifiers })),
     ));
-    installInterceptor(vi.fn());
+    installInterceptor({ onArena: vi.fn() });
 
     await fetch('https://labrute.example/api/user/authenticate');
 
@@ -69,7 +70,7 @@ describe('installInterceptor', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(makeBrute({ name: 'Sam', level: 10 }))))
       .mockResolvedValueOnce(new Response(JSON.stringify(makeBrute({ name: 'Sam', level: 11 }))));
     stubGameFetch(fetchMock);
-    installInterceptor(vi.fn());
+    installInterceptor({ onArena: vi.fn() });
 
     await fetch('https://labrute.example/api/brute/Sam/for-hook');
     expect(store.getBrute('Sam')?.level).toBe(10);
@@ -81,7 +82,7 @@ describe('installInterceptor', () => {
   it('renvoie la réponse originale, toujours lisible par l\'appelant (preuve du clone)', async () => {
     const originalResponse = new Response(JSON.stringify([makeBrute({ name: 'Adv' })]));
     stubGameFetch(vi.fn().mockResolvedValue(originalResponse));
-    installInterceptor(vi.fn());
+    installInterceptor({ onArena: vi.fn() });
 
     const result = await fetch('https://labrute.example/api/brute/Sam/get-opponents/1');
 
@@ -92,14 +93,44 @@ describe('installInterceptor', () => {
 
   it('ne rejette jamais quand la réponse est illisible', async () => {
     stubGameFetch(vi.fn().mockResolvedValue(new Response('pas du json', { status: 200 })));
-    installInterceptor(vi.fn());
+    installInterceptor({ onArena: vi.fn() });
 
     await expect(fetch('https://labrute.example/api/brute/Sam/get-opponents/1')).resolves.toBeInstanceOf(Response);
   });
 
+  // L'URL du combat n'est pas connue et peut changer : c'est la forme de la réponse
+  // qui la trahit. Sans cela, aucune calibration n'est possible.
+  it('reconnaît le résultat d\'un combat quelle que soit son URL', async () => {
+    stubGameFetch(vi.fn().mockResolvedValue(new Response(
+      JSON.stringify(realFight),
+      { headers: { 'content-type': 'application/json' } },
+    )));
+    const onFight = vi.fn();
+    installInterceptor({ onArena: vi.fn(), onFight });
+
+    await fetch('https://labrute.example/api/brute/Sam/versus/LUISVENTURA/1');
+
+    expect(onFight).toHaveBeenCalledWith({
+      id: realFight.id, winner: 'LUISVENTURA', loser: 'LeH_',
+    });
+  });
+
+  it('ne prend pas une réponse quelconque pour un combat', async () => {
+    stubGameFetch(vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ gold: 12 }),
+      { headers: { 'content-type': 'application/json' } },
+    )));
+    const onFight = vi.fn();
+    installInterceptor({ onArena: vi.fn(), onFight });
+
+    await fetch('https://labrute.example/api/user/Sam/gold');
+
+    expect(onFight).not.toHaveBeenCalled();
+  });
+
   it('ne capture les en-têtes que sur les requêtes de l\'API du jeu, pour ne pas les écraser avec une requête hors-jeu', async () => {
     stubGameFetch(vi.fn().mockResolvedValue(new Response('ok')));
-    installInterceptor(vi.fn());
+    installInterceptor({ onArena: vi.fn() });
 
     await fetch('https://labrute.example/api/brute/Sam/for-hook', { headers: { 'x-security-check': 'bon' } });
     expect(store.getHeaders()).toEqual({ 'x-security-check': 'bon' });

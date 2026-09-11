@@ -18,3 +18,15 @@ export type RawBrute = Pick<Brute,
   | 'speedStat' | 'speedModifier' | 'speedValue'
   | 'agilityStat' | 'agilityModifier' | 'agilityValue'
   | 'body' | 'colors' | 'skills' | 'weapons' | 'pets' | 'eventId'>;
+
+/**
+ * Ce qu'un combat simulé rapporte. Le vainqueur est la réponse ; la durée et les points
+ * de vie restants disent *comment* on gagne, ce qu'un pourcentage seul ne dit pas.
+ */
+export type FightOutcome = {
+  result: 'win' | 'loss';
+  /** Actions jouées avant la chute d'un camp (un tour de la boucle du moteur). */
+  turns: number;
+  /** Points de vie restants de notre brute, en fraction de son maximum. */
+  hpLeft: number;
+};

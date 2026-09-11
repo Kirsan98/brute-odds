@@ -1,10 +1,18 @@
 import type { RawBrute } from '../engine/types.js';
+import { asFightResult, type FightResult } from './fightResult.js';
 import { store } from './store.js';
 
 const OPPONENTS = /\/api\/brute\/([^/]+)\/get-opponents\//;
 const HOOK = /\/api\/brute\/([^/]+)\/for-hook/;
 
-export const installInterceptor = (onArena: (bruteName: string) => void) => {
+export type Hooks = {
+  onArena: (bruteName: string) => void;
+  /** Le résultat d'un vrai combat, reconnu à sa forme et non à son URL : c'est ce qui
+   *  permet de confronter nos annonces à ce que le jeu a réellement produit. */
+  onFight?: (fight: FightResult) => void;
+};
+
+export const installInterceptor = (hooks: Hooks) => {
   const original = window.fetch;
 
   window.fetch = async (...args: Parameters<typeof fetch>) => {
@@ -33,7 +41,13 @@ export const installInterceptor = (onArena: (bruteName: string) => void) => {
         if (match?.[1]) {
           const bruteName = decodeURIComponent(match[1]);
           store.putOpponents(bruteName, await response.clone().json());
-          onArena(bruteName);
+          hooks.onArena(bruteName);
+        } else if (hooks.onFight && url.includes('/api/')
+          && response.headers.get('content-type')?.includes('json')) {
+          // On ne connaît pas l'URL du combat, et elle peut changer : on regarde la
+          // forme de la réponse. Un objet qui n'est pas un combat est simplement ignoré.
+          const fight = asFightResult(await response.clone().json());
+          if (fight) hooks.onFight(fight);
         }
       }
     } catch {

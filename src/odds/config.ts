@@ -1,8 +1,18 @@
-// Valeur issue de la mesure de scripts/bench.ts — voir §8 du spec.
-// Coût mesuré ≈ 0.043 ms/combat (moyenne de 6 runs, 2000 combats chacun, après
-// chauffe de 200 combats) sur brutes par défaut (makeBrute(), sans compétence,
-// arme ni familier). Règle : plus grand N tel que coût × N × 6 ≤ 2 s, plafonné
-// à 2000. À ce coût, même N = 2000 ne consomme que ≈ 0,52 s pour 6 adversaires
-// (2000 × 6 × 0.043 ms) — très en dessous du budget de 2 s : c'est le plafond
-// qui fixe N, pas le budget de temps.
-export const SIMULATIONS = 2000;
+// Nombre de combats simulés, en deux salves. Valeurs issues de la mesure de
+// scripts/bench.ts, clone rapide compris :
+//
+//   brutes nues              0,031 ms/combat
+//   brutes réelles équipées  0,061 ms/combat   (niveau 16, 7 armes / 3 compétences
+//                                               contre 5 compétences ; 0,084 sans le
+//                                               clone rapide)
+//
+// La première salve situe les six adversaires. Elle suffit à écarter ceux qui sont
+// nettement au-dessus ou au-dessous ; elle ne suffit pas à départager deux adversaires
+// à deux points l'un de l'autre, et c'est précisément là que se prend la décision.
+// La seconde salve n'est donc tirée que sur les prétendants, ceux dont l'intervalle
+// touche encore celui du meilleur.
+//
+// Coût au pire (brutes équipées, six prétendants, six workers en parallèle) :
+// 1500 x 0,061 ms puis 6000 x 0,061 ms, soit environ 0,45 s de calcul perçu.
+export const FIRST_PASS = 1500;
+export const SECOND_PASS = 6000;

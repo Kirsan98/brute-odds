@@ -1,56 +1,72 @@
 import { fetchProfileBrutes, installInterceptor } from './intercept.js';
-import { resolveBackups } from './resolveBackups.js';
-import { renderOdds } from './inject.js';
+import { renderBest, renderOdds } from './inject.js';
 import { store } from './store.js';
-import type { WorkerResponse } from '../worker/protocol.js';
+import { createPool, poolSize, type Pool, type WorkerLike } from './pool.js';
+import type { WorkerRequest } from '../worker/protocol.js';
+import { createArenaHandler } from './orchestrate.js';
+import { createCalibrationLog } from './calibrationLog.js';
+import { createOpponentPool } from './opponentPool.js';
 
 // Remplacé au build par le code du worker, inséré comme chaîne (scripts/build.mjs) :
 // un userscript est un fichier unique, il n'a pas de second fichier à charger.
 declare const WORKER_SOURCE: string;
 
-const worker = new Worker(URL.createObjectURL(
+const OPPONENTS_PER_ARENA = 6;
+
+const spawn = (): WorkerLike => new Worker(URL.createObjectURL(
   new Blob([WORKER_SOURCE], { type: 'application/javascript' }),
-));
+)) as unknown as WorkerLike;
 
-const pending = new Map<string, string>();
-
-worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-  const name = pending.get(event.data.id);
-  if (!name) return;
-  renderOdds(name, event.data.estimation);
-  pending.delete(event.data.id);
+// Le pool n'existe qu'à la première arène : le script tourne sur toutes les pages du
+// site, et la plupart n'ont aucun combat à estimer.
+let pool: Pool | undefined;
+const run = (request: WorkerRequest) => {
+  pool ??= createPool(
+    poolSize(navigator.hardwareConcurrency, OPPONENTS_PER_ARENA),
+    spawn,
+  );
+  return pool.run(request);
 };
 
-const onArena = async (bruteName: string) => {
-  const brute = store.getBrute(bruteName);
-  const opponents = store.getOpponents(bruteName);
-  if (!brute || !opponents) return;
+const calibration = createCalibrationLog(localStorage);
+// Les six adversaires d'une visite sont un tirage au hasard de la population qu'on
+// affronte (getOpponents.ts) : les accumuler, c'est l'échantillonner.
+const opponents = createOpponentPool(localStorage);
 
-  // Tous les noms d'abord : c'est en les connaissant tous qu'on sait délimiter la
-  // carte de chacun, et les six adversaires affichent leur attente sans délai.
-  opponents.forEach((opponent) => renderOdds(opponent.name, 'pending'));
+const onArena = createArenaHandler({
+  getBrute: (name) => store.getBrute(name),
+  getOpponents: (name) => store.getOpponents(name),
+  getModifiers: () => store.getModifiers(),
+  getOwnBrutes: () => store.getOwnBrutes(),
+  fetchProfileBrutes,
+  run,
+  render: renderOdds,
+  renderBest,
+  onPrediction: calibration.remember,
+});
 
-  for (const opponent of opponents) {
-    // Les viviers de renfort, pas les renforts : le tirage se fait combat par combat,
-    // dans le worker.
-    const backups = await resolveBackups(brute, opponent, {
-      ownBrutes: () => store.getOwnBrutes(),
-      fetchProfileBrutes,
-    });
+installInterceptor({
+  onArena: (bruteName) => {
+    opponents.remember(store.getOpponents(bruteName) ?? []);
+    void onArena(bruteName);
+  },
+  onFight: (fight) => {
+    const recorded = calibration.record(fight);
+    if (!recorded) return;
+    // Une ligne par combat mesuré : la calibration se voit sans avoir à la demander.
+    console.info(
+      `brute-odds : annoncé ${Math.round(recorded.predicted * 100)} %, résultat `
+      + `${recorded.won ? 'victoire' : 'défaite'}. bruteOdds.calibration() pour le bilan.`,
+    );
+  },
+});
 
-    const id = `${bruteName}:${opponent.name}`;
-    pending.set(id, opponent.name);
-    worker.postMessage({
-      id,
-      input: {
-        brute,
-        opponent,
-        modifiers: store.getModifiers(),
-        backups: { own: backups.own, opponent: backups.opponent },
-        approximate: backups.approximate,
-      },
-    });
-  }
+// Seule interface du script en dehors des badges : le bilan de calibration, à la console.
+(window as unknown as { bruteOdds: unknown }).bruteOdds = {
+  calibration: () => calibration.report(),
+  records: () => calibration.records(),
+  reset: () => calibration.reset(),
+  // Le vivier : de combien d'adversaires réels le conseil dispose.
+  pool: () => opponents.size(),
+  forgetPool: () => opponents.reset(),
 };
-
-installInterceptor((bruteName) => { void onArena(bruteName); });
